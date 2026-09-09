@@ -40,7 +40,7 @@ spec:
       containers:
         - name: db
           # Replace with an OpenShift-compatible image you build from db/Dockerfile.
-          image: quay.io/REPLACE_ME/employee-db:latest
+          image: quay.io/amritmatti/employee-db:latest
           ports: [{ name: postgres, containerPort: 5432 }]
           envFrom: [{ secretRef: { name: employee-db-credentials } }]
           volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
@@ -66,7 +66,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: backend
-          image: quay.io/REPLACE_ME/employee-backend:latest
+          image: quay.io/amritmatti/employee-backend:latest
           ports: [{ name: http, containerPort: 8080 }]
           env:
             - { name: DB_HOST, value: employee-db.db.svc.cluster.local }
@@ -95,7 +95,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: frontend
-          image: quay.io/REPLACE_ME/employee-frontend:latest
+          image: quay.io/amritmatti/employee-frontend:latest
           ports: [{ name: http, containerPort: 8080 }]
           env: [{ name: BACKEND_URL, value: http://employee-api.backend.svc.cluster.local:8080 }]
           readinessProbe: { httpGet: { path: /healthz, port: http } }
