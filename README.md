@@ -169,4 +169,38 @@ This documentation is released under the [MIT License](LICENSE).
 
 ## Employee directory sample
 
-A separate Node.js frontend, backend, and PostgreSQL database sample is available in [`docs/employee-app.md`](docs/employee-app.md). It includes Docker Compose for persistent local data and OpenShift projects/network policies for the requested frontend → backend/database, backend → database, and database-no-egress topology.
+A separate Node.js employee-directory sample is included in this repository. It has a browser-facing frontend, a private REST API, and a PostgreSQL database. The frontend proxies `/api` requests to the backend; database records persist in the `employee-db-data` volume.
+
+### Run the employee directory locally
+
+From the repository root, build and start all three services:
+
+```bash
+docker compose up --build -d
+docker compose ps
+curl -fsS http://localhost:8080/healthz
+```
+
+Open <http://localhost:8080> to add and view employees. The database volume is retained when the stack is stopped or brought down without `-v`:
+
+```bash
+docker compose down
+docker compose up -d
+curl -fsS http://localhost:8080/api/employees
+```
+
+Use `docker compose down -v` only when you intentionally want to delete all local employee records.
+
+### Deploy the employee directory to OpenShift
+
+Build and push the `frontend/`, `backend/`, and `db/` images to a registry your cluster can pull from. Before applying [`manifests/employee-app/openshift.yaml`](manifests/employee-app/openshift.yaml), replace its `quay.io/REPLACE_ME/...` image references and both `replace-before-applying` password values. Then deploy and retrieve the public frontend route:
+
+```bash
+oc apply -f manifests/employee-app/openshift.yaml
+oc -n db wait --for=condition=Ready pod -l app.kubernetes.io/component=db --timeout=5m
+oc -n backend wait --for=condition=Ready pod -l app.kubernetes.io/component=backend --timeout=5m
+oc -n frontend wait --for=condition=Ready pod -l app.kubernetes.io/component=frontend --timeout=5m
+printf 'https://%s\n' "$(oc -n frontend get route employee-ui -o jsonpath='{.spec.host}')"
+```
+
+The OpenShift manifest creates separate `frontend`, `backend`, and `db` projects. Its network policies permit `frontend → backend, db`, `backend → db`, and DNS, while denying database egress. For complete image-build commands, API examples, persistence guidance, and network-policy details, see [`docs/employee-app.md`](docs/employee-app.md).
