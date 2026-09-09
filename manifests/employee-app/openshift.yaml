@@ -1,22 +1,5 @@
-# Apply each Namespace as an OpenShift project: oc apply -f manifests/employee-app/openshift.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: frontend
-  labels: { employee-app/zone: frontend }
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: backend
-  labels: { employee-app/zone: backend }
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: db
-  labels: { employee-app/zone: db }
----
+# The frontend, backend, and db projects must already exist and be labeled.
+# See projects.yaml and docs/employee-app.md for administrator provisioning steps.
 apiVersion: v1
 kind: Secret
 metadata: { name: employee-db-credentials, namespace: db }

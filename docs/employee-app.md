@@ -63,7 +63,18 @@ Email is unique; required fields and basic email/date formats are validated by t
 
 ## Deploy to OpenShift
 
-`manifests/employee-app/openshift.yaml` creates three namespaces (projects), services, a durable database PVC, workload templates, a frontend Route, and namespace-based network policies. It expects images you have built and pushed to a registry that your cluster can pull from.
+`manifests/employee-app/openshift.yaml` creates the application resources: services, a durable database PVC, workload templates, a frontend Route, and namespace-based network policies. It expects images you have built and pushed to a registry that your cluster can pull from.
+
+The three projects are intentionally separate in [`manifests/employee-app/projects.yaml`](../manifests/employee-app/projects.yaml). Creating or reading projects requires cluster-scoped permissions, and applying a resource also requires `get` permission on that resource. Have a cluster administrator provision the projects, preserve the labels in that file, and grant your deployment user a namespace role such as `edit` in **each** project. For example, an administrator deploying for user `amritmatti` can run:
+
+```bash
+oc apply -f manifests/employee-app/projects.yaml
+for project in frontend backend db; do
+  oc adm policy add-role-to-user edit amritmatti -n "$project"
+done
+```
+
+Do not run `oc adm` as an unprivileged user. If the projects are already managed by your platform team, ask that team to grant equivalent `get`, `create`, `patch`, and `update` permissions for the resources in `openshift.yaml` in all three projects.
 
 1. Build and push the three images. For example, replace `REGISTRY/ACCOUNT` with your approved registry path:
 
@@ -81,9 +92,17 @@ Email is unique; required fields and basic email/date formats are validated by t
    - replace both `replace-before-applying` password values with the **same strong password**;
    - if the cluster does not provide a default StorageClass, set an approved `storageClassName` on `employee-db-data`.
 
-3. Apply and wait:
+3. Verify access, then apply and wait. All checks must return `yes`; otherwise, request the missing role from the project administrator instead of retrying the apply:
 
    ```bash
+   for project in frontend backend db; do
+     oc auth can-i get secrets -n "$project"
+     oc auth can-i patch deployments.apps -n "$project"
+     oc auth can-i patch services -n "$project"
+     oc auth can-i patch networkpolicies.networking.k8s.io -n "$project"
+   done
+   oc auth can-i patch routes.route.openshift.io -n frontend
+   oc auth can-i patch persistentvolumeclaims -n db
    oc apply -f manifests/employee-app/openshift.yaml
    oc -n db wait --for=condition=Ready pod -l app.kubernetes.io/component=db --timeout=5m
    oc -n backend wait --for=condition=Ready pod -l app.kubernetes.io/component=backend --timeout=5m
