@@ -112,6 +112,20 @@ spec:
   selector:
     app.kubernetes.io/name: wordpress
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress-apache-config
+  labels:
+    app.kubernetes.io/name: wordpress
+    app.kubernetes.io/part-of: wordpress
+data:
+  ports.conf: |
+    # OpenShift's restricted SCC runs containers with an arbitrary non-root UID.
+    # Use an unprivileged port instead of Apache's default port 80.
+    Listen 8080
+    ServerName wordpress
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -137,7 +151,7 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
           env:
             - name: WORDPRESS_DB_HOST
               value: mysql:3306
@@ -193,6 +207,10 @@ spec:
           volumeMounts:
             - name: wordpress-data
               mountPath: /var/www/html
+            - name: apache-config
+              mountPath: /etc/apache2/ports.conf
+              subPath: ports.conf
+              readOnly: true
           resources:
             requests:
               cpu: 100m
@@ -204,6 +222,9 @@ spec:
         - name: wordpress-data
           persistentVolumeClaim:
             claimName: wordpress-data
+        - name: apache-config
+          configMap:
+            name: wordpress-apache-config
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
