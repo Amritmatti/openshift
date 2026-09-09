@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS employees (
+  id BIGSERIAL PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(254) NOT NULL UNIQUE,
+  date_of_birth DATE NOT NULL,
+  location VARCHAR(120) NOT NULL,
+  department VARCHAR(120) NOT NULL,
+  job_title VARCHAR(120) NOT NULL
+);
