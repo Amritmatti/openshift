@@ -6,4 +6,9 @@
 # Never commit local credentials or generated secret manifests
 *.secret.yaml
 *.secret.yml
+
+# Node.js dependencies and local environment overrides
+**/node_modules/
 .env
+.env.*
+!.env.example

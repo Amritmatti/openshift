@@ -1,0 +1,160 @@
+# Apply each Namespace as an OpenShift project: oc apply -f manifests/employee-app/openshift.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frontend
+  labels: { employee-app/zone: frontend }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backend
+  labels: { employee-app/zone: backend }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db
+  labels: { employee-app/zone: db }
+---
+apiVersion: v1
+kind: Secret
+metadata: { name: employee-db-credentials, namespace: db }
+type: Opaque
+stringData: { POSTGRES_DB: employees, POSTGRES_USER: employees, POSTGRES_PASSWORD: replace-before-applying }
+---
+# Keep this value identical to the database secret; Kubernetes Secrets cannot cross namespaces.
+apiVersion: v1
+kind: Secret
+metadata: { name: employee-db-credentials, namespace: backend }
+type: Opaque
+stringData: { DB_PASSWORD: replace-before-applying }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: employee-db-data, namespace: db }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 1Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: employee-db, namespace: db }
+spec:
+  selector: { app.kubernetes.io/component: db }
+  ports: [{ name: postgres, port: 5432, targetPort: postgres }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: employee-db, namespace: db }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/component: db } }
+  template:
+    metadata: { labels: { app.kubernetes.io/component: db } }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: db
+          # Replace with an OpenShift-compatible image you build from db/Dockerfile.
+          image: quay.io/REPLACE_ME/employee-db:latest
+          ports: [{ name: postgres, containerPort: 5432 }]
+          envFrom: [{ secretRef: { name: employee-db-credentials } }]
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+          readinessProbe: { exec: { command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'] }, initialDelaySeconds: 5 }
+      volumes: [{ name: data, persistentVolumeClaim: { claimName: employee-db-data } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: employee-api, namespace: backend }
+spec:
+  selector: { app.kubernetes.io/component: backend }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: employee-api, namespace: backend }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/component: backend } }
+  template:
+    metadata: { labels: { app.kubernetes.io/component: backend } }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: backend
+          image: quay.io/REPLACE_ME/employee-backend:latest
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - { name: DB_HOST, value: employee-db.db.svc.cluster.local }
+            - { name: DB_NAME, value: employees }
+            - { name: DB_USER, value: employees }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: employee-db-credentials, key: DB_PASSWORD } }
+          readinessProbe: { httpGet: { path: /healthz, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: employee-ui, namespace: frontend }
+spec:
+  selector: { app.kubernetes.io/component: frontend }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: employee-ui, namespace: frontend }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/component: frontend } }
+  template:
+    metadata: { labels: { app.kubernetes.io/component: frontend } }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: frontend
+          image: quay.io/REPLACE_ME/employee-frontend:latest
+          ports: [{ name: http, containerPort: 8080 }]
+          env: [{ name: BACKEND_URL, value: http://employee-api.backend.svc.cluster.local:8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http } }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata: { name: employee-ui, namespace: frontend }
+spec: { to: { kind: Service, name: employee-ui }, port: { targetPort: http }, tls: { termination: edge } }
+---
+# Frontend may call backend and database; backend may call only database; database has no egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: frontend-egress, namespace: frontend }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { employee-app/zone: backend } } }]
+    - to: [{ namespaceSelector: { matchLabels: { employee-app/zone: db } } }]
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: openshift-dns } } }]
+      ports: [{ protocol: UDP, port: 5353 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: backend-traffic, namespace: backend }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: [{ from: [{ namespaceSelector: { matchLabels: { employee-app/zone: frontend } } }] }]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { employee-app/zone: db } } }]
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: openshift-dns } } }]
+      ports: [{ protocol: UDP, port: 5353 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: db-traffic, namespace: db }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - { namespaceSelector: { matchLabels: { employee-app/zone: frontend } } }
+        - { namespaceSelector: { matchLabels: { employee-app/zone: backend } } }
+  egress: []

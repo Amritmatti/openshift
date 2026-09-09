@@ -166,3 +166,7 @@ The manifest sets CPU/memory requests and limits, uses an `edge` TLS route, and 
 ## License
 
 This documentation is released under the [MIT License](LICENSE).
+
+## Employee directory sample
+
+A separate Node.js frontend, backend, and PostgreSQL database sample is available in [`docs/employee-app.md`](docs/employee-app.md). It includes Docker Compose for persistent local data and OpenShift projects/network policies for the requested frontend → backend/database, backend → database, and database-no-egress topology.
