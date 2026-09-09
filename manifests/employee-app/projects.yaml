@@ -1,0 +1,19 @@
+# Cluster administrator bootstrap manifest. Apply before openshift.yaml.
+# These namespace labels are used by the application's NetworkPolicies.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frontend
+  labels: { employee-app/zone: frontend }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backend
+  labels: { employee-app/zone: backend }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db
+  labels: { employee-app/zone: db }

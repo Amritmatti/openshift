@@ -193,7 +193,7 @@ Use `docker compose down -v` only when you intentionally want to delete all loca
 
 ### Deploy the employee directory to OpenShift
 
-Build and push the `frontend/`, `backend/`, and `db/` images to a registry your cluster can pull from. Before applying [`manifests/employee-app/openshift.yaml`](manifests/employee-app/openshift.yaml), replace its `quay.io/REPLACE_ME/...` image references and both `replace-before-applying` password values. Then deploy and retrieve the public frontend route:
+Build and push the `frontend/`, `backend/`, and `db/` images to a registry your cluster can pull from. Before applying [`manifests/employee-app/openshift.yaml`](manifests/employee-app/openshift.yaml), replace its `quay.io/REPLACE_ME/...` image references and both `replace-before-applying` password values. A cluster administrator must first create and label the three projects from [`manifests/employee-app/projects.yaml`](manifests/employee-app/projects.yaml), then grant your user a role such as `edit` in each project. This prevents the forbidden errors caused by attempting to manage cluster-scoped namespaces or resources in projects where you have no access. Then deploy and retrieve the public frontend route:
 
 ```bash
 oc apply -f manifests/employee-app/openshift.yaml
@@ -203,4 +203,4 @@ oc -n frontend wait --for=condition=Ready pod -l app.kubernetes.io/component=fro
 printf 'https://%s\n' "$(oc -n frontend get route employee-ui -o jsonpath='{.spec.host}')"
 ```
 
-The OpenShift manifest creates separate `frontend`, `backend`, and `db` projects. Its network policies permit `frontend → backend, db`, `backend → db`, and DNS, while denying database egress. For complete image-build commands, API examples, persistence guidance, and network-policy details, see [`docs/employee-app.md`](docs/employee-app.md).
+The application manifest deploys into separate `frontend`, `backend`, and `db` projects. Its network policies permit `frontend → backend, db`, `backend → db`, and DNS, while denying database egress. For administrator provisioning, access checks, complete image-build commands, API examples, persistence guidance, and network-policy details, see [`docs/employee-app.md`](docs/employee-app.md).
