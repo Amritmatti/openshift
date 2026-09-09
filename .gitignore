@@ -1,0 +1,9 @@
+# Local editor and operating-system files
+.DS_Store
+.idea/
+.vscode/
+
+# Never commit local credentials or generated secret manifests
+*.secret.yaml
+*.secret.yml
+.env
