@@ -22,7 +22,7 @@ MySQL Service :3306  ----->  MySQL Pod + PVC
 
 | Component | Docker Hub image | Purpose |
 | --- | --- | --- |
-| WordPress | `wordpress:6-apache` | PHP/Apache web application |
+| WordPress | `wordpress:6-apache` | PHP/Apache web application (configured to listen on port 8080) |
 | MySQL | `mysql:8.4` | WordPress database |
 
 Both image names are explicitly defined in [`manifests/wordpress.yaml`](manifests/wordpress.yaml). For repeatable deployments, replace floating major tags with an image digest you have tested.
@@ -128,6 +128,7 @@ oc rollout status deployment/wordpress
 | --- | --- | --- |
 | Pods remain `Pending` | `oc describe pod <pod-name>` and `oc get pvc` | Your sandbox may not provide a default storage class or enough quota. Ask for storage or set a permitted `storageClassName`. |
 | `ImagePullBackOff` | `oc describe pod <pod-name>` | The cluster cannot reach Docker Hub or needs registry credentials. Mirror images or configure a pull secret. |
+| WordPress cannot start because Apache cannot bind to port 80 | `oc logs deployment/wordpress` | Apply the current manifest. Its `wordpress-apache-config` ConfigMap makes Apache listen on unprivileged port 8080, which works with OpenShift's restricted SCC. Do not grant `anyuid` or privileged access. |
 | WordPress cannot connect to the database | `oc logs deployment/wordpress` and `oc get endpoints mysql` | Ensure the `wordpress-secrets` secret exists before applying and MySQL is ready. |
 | Installer reappears or uploads disappear | `oc get pvc` | Confirm the `wordpress-data` PVC is `Bound`; do not delete it during redeployments. |
 | Route does not resolve externally | `oc get route wordpress` | Confirm the cluster has an ingress domain and that your sandbox permits public routes. |
